@@ -1,16 +1,15 @@
 services:
   api:
-    build: .
+    image: ${DOCKERHUB_USERNAME}/jd_matcher_ai:latest
+    pull_policy: always
     container_name: jd_matcher_v2_api
+    restart: unless-stopped
     env_file:
       - .env
     ports:
       - "8000:8000"
     volumes:
-      - ./app:/app/app
-      - ./docs:/app/docs
       - ./data:/app/data
-      - ../jd-matcher:/legacy/jd-matcher:ro
     depends_on:
       mysql:
         condition: service_healthy
@@ -18,16 +17,14 @@ services:
         condition: service_healthy
 
   frontend:
-    build:
-      context: .
-      dockerfile: ui/Dockerfile
+    image: ${DOCKERHUB_USERNAME}/jd_matcher_ai_ui:latest
+    pull_policy: always
     container_name: jd_matcher_v2_frontend
+    restart: unless-stopped
     environment:
-      API_BASE_URL: http://api:8000
+      API_BASE_URL: ${API_BASE_URL}
     ports:
       - "8501:8501"
-    volumes:
-      - ./ui:/app/ui
     depends_on:
       api:
         condition: service_started
