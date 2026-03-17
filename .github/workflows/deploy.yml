@@ -27,13 +27,13 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/jd-matcher-ai:latest
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/jd_matcher_ai:latest
 
       - name: Publish build summary
         run: |
           {
             echo "## CI Result"
             echo "- Docker Hub login success"
-            echo "- Backend image pushed: ${{ secrets.DOCKERHUB_USERNAME }}/jd-matcher-ai:latest"
+            echo "- Backend image pushed: ${{ secrets.DOCKERHUB_USERNAME }}/jd_matcher_ai:latest"
             echo "- No deployment step is configured in this workflow"
           } >> "$GITHUB_STEP_SUMMARY"

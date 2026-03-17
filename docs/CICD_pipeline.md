@@ -75,12 +75,11 @@ flowchart LR
 目前推送的 tag：
 
 ```text
-<dockerhub_username>/jd-matcher-ai:latest
+<dockerhub_username>/jd_matcher_ai:latest
 ```
 
 注意：
 
-- 這裡使用的是 `jd-matcher-ai`，不是 `jd_matcher_ai`
 - image 名稱已跟 workflow 設定一致
 
 ### 3.3 Docker Hub
@@ -91,7 +90,7 @@ Docker Hub 目前扮演的角色只有一個：
 
 目前 workflow 成功後，Docker Hub 應該能看到新的：
 
-- `<dockerhub_username>/jd-matcher-ai:latest`
+- `<dockerhub_username>/jd_matcher_ai:latest`
 
 ## 4. GitHub Actions 實際執行流程
 
@@ -156,7 +155,7 @@ on:
 
 - build context: repository root
 - push: `true`
-- tag: `${{ secrets.DOCKERHUB_USERNAME }}/jd-matcher-ai:latest`
+- tag: `${{ secrets.DOCKERHUB_USERNAME }}/jd_matcher_ai:latest`
 
 結果：
 
@@ -253,7 +252,7 @@ GitHub Actions logs 目前會清楚顯示：
 
 目前需要確認 Docker Hub 上已存在或允許建立：
 
-1. `jd-matcher-ai`
+1. `jd_matcher_ai`
 
 如果 repository 權限或命名不正確，workflow push 會失敗。
 
