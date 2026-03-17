@@ -15,8 +15,9 @@ from app.prompts.schemas import PARSER_SCHEMA
 from app.services.cache_service import CacheService
 from app.services.openai_client import OpenAIClient
 from app.services.resume_service import load_resume_payload
+from app.schemas.ai import ParserAIResult
 
-PROMPT_PATH = Path(__file__).resolve().parents[1] / "prompts" / "parser_prompt.txt"
+PROMPT_PATH = settings.prompt_dir / "parser_prompt.txt"
 
 
 def load_prompt() -> str:
@@ -85,6 +86,9 @@ class ParserService:
 
         if payload is None:
             payload = self._generate_analysis(job.jd_text, resume_text)
+
+        validated = ParserAIResult.model_validate(payload)
+        payload = validated.model_dump()
 
         job.company = job.company or payload.get("company") or None
         job.role_title = job.role_title or payload.get("role_title") or None
@@ -179,6 +183,7 @@ class ParserService:
             user_content=build_user_content(jd_text, resume_text),
             schema=PARSER_SCHEMA,
             schema_name="job_analysis",
+            pipeline_type="parser",
             max_output_tokens=900,
         )
 
@@ -191,6 +196,7 @@ class ParserService:
         return "Low priority"
 
     def _row_to_payload(self, row: JobAnalysis, job: Job | None = None) -> dict[str, Any]:
+        top_gaps = _parse_json_list(row.top_gaps)
         return {
             "company": (job.company if job else None) or "",
             "role_title": (job.role_title if job else None) or "",
@@ -201,7 +207,8 @@ class ParserService:
             "nice_to_have_keywords": _parse_json_list(row.nice_to_have_keywords),
             "domain_keywords": _parse_json_list(row.domain_keywords),
             "years_required": row.years_required,
-            "top_gaps": _parse_json_list(row.top_gaps),
+            "gap_keywords": top_gaps,
+            "top_gaps": top_gaps,
             "screening_risks": _parse_json_list(row.screening_risks),
             "recommended_resume_version": row.recommended_resume_version,
             "resume_tweak_suggestions": _parse_json_list(row.resume_tweak_suggestions),

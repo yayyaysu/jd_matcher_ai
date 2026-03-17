@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, Field
 
 
 class KeywordCount(BaseModel):
@@ -18,8 +18,9 @@ class ClusterSummary(BaseModel):
 
 class StrategyGenerateRequest(BaseModel):
     cluster: str | None = Field(default="all")
-    filter_company: str | None = None
-    filter_min_score: int | None = Field(default=None, ge=0, le=100)
+    filter_company: str | None = Field(default=None, validation_alias=AliasChoices("filter_company", "company"))
+    filter_min_score: int | None = Field(default=None, ge=0, le=100, validation_alias=AliasChoices("filter_min_score", "min_score"))
+    applied_status: str | None = Field(default=None, validation_alias=AliasChoices("applied_status", "applied"))
     force: bool = False
 
 

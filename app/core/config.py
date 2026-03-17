@@ -28,8 +28,9 @@ class Settings(BaseSettings):
     parser_model: str = "gpt-4.1-mini"
     strategist_model: str = "gpt-4.1-mini"
 
-    resume_path: str = "resume.txt"
+    resume_path: str = "data/resume.txt"
     outputs_dir: str = "data/outputs"
+    logs_dir: str = "logs"
 
     @property
     def database_url(self) -> str:
@@ -61,6 +62,14 @@ class Settings(BaseSettings):
         return self.outputs_path / filename
 
     @property
+    def logs_path(self) -> Path:
+        path = Path(self.logs_dir)
+        if not path.is_absolute():
+            path = self.project_root / path
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
+    @property
     def resolved_resume_path(self) -> Path:
         configured = Path(self.resume_path)
         candidates: list[Path] = []
@@ -70,8 +79,12 @@ class Settings(BaseSettings):
             candidates.extend(
                 [
                     self.project_root / configured,
+                    self.project_root / "data" / "resume.txt",
                     self.project_root.parent / "jd-matcher" / configured,
+                    self.project_root.parent / "jd-matcher" / "resume.txt",
                     Path("/legacy/jd-matcher") / configured,
+                    Path("/legacy/jd-matcher/data/resume.txt"),
+                    Path("/legacy/jd-matcher/resume.txt"),
                 ]
             )
 

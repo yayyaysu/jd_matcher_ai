@@ -17,6 +17,7 @@ async def generate_strategy(payload: StrategyGenerateRequest, db: Session = Depe
         cluster=payload.cluster,
         filter_company=payload.filter_company,
         filter_min_score=payload.filter_min_score,
+        applied_status=payload.applied_status,
         force=payload.force,
     )
     return StrategyGenerateResponse(**result)

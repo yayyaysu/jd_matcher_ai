@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import re
 from datetime import datetime
-from pathlib import Path
 from typing import Any
 
 from openai import OpenAI
@@ -25,7 +24,7 @@ class OpenAIClient:
         if not resolved_key:
             raise ValueError("OPENAI_API_KEY is not configured.")
         self._client = OpenAI(api_key=resolved_key)
-        self._token_log_file = settings.outputs_path / "token_usage.txt"
+        self._token_log_file = settings.logs_path / "openai_usage.txt"
         self._token_log_file.parent.mkdir(parents=True, exist_ok=True)
 
     @retry(
@@ -41,6 +40,7 @@ class OpenAIClient:
         user_content: str,
         schema: dict[str, Any],
         schema_name: str,
+        pipeline_type: str,
         max_output_tokens: int = 800,
     ) -> dict[str, Any]:
         response = self._client.responses.create(
@@ -59,7 +59,7 @@ class OpenAIClient:
             },
             max_output_tokens=max_output_tokens,
         )
-        self._record_token_usage(response, model, schema_name)
+        self._record_token_usage(response, pipeline_type, model)
 
         parsed = self._extract_parsed_from_response(response)
         if parsed is not None:
@@ -103,7 +103,7 @@ class OpenAIClient:
             return None
         return None
 
-    def _record_token_usage(self, response: Any, model: str, task: str) -> None:
+    def _record_token_usage(self, response: Any, pipeline_type: str, model: str) -> None:
         try:
             usage = getattr(response, "usage", None)
             if usage is None:
@@ -112,14 +112,9 @@ class OpenAIClient:
             output_tokens = getattr(usage, "output_tokens", 0)
             total_tokens = getattr(usage, "total_tokens", input_tokens + output_tokens)
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            log_entry = (
-                f"{timestamp} | {model} | {task} | "
-                f"Input: {input_tokens} | Output: {output_tokens} | Total: {total_tokens}\n"
-            )
-            self._token_log_file.write_text(
-                self._token_log_file.read_text(encoding="utf-8") + log_entry if self._token_log_file.exists() else log_entry,
-                encoding="utf-8",
-            )
+            log_entry = f"{timestamp} {pipeline_type} {model} {input_tokens} {output_tokens} {total_tokens}\n"
+            with self._token_log_file.open("a", encoding="utf-8") as handle:
+                handle.write(log_entry)
         except Exception:
             pass
 

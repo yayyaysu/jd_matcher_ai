@@ -8,7 +8,6 @@ services:
       - "8000:8000"
     volumes:
       - ./app:/app/app
-      - ./scripts:/app/scripts
       - ./docs:/app/docs
       - ./data:/app/data
       - ../jd-matcher:/legacy/jd-matcher:ro

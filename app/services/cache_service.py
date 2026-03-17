@@ -29,23 +29,25 @@ class CacheService:
 
     @staticmethod
     def build_parser_key(job_id: str, resume_hash: str, analysis_version: int) -> str:
-        return f"parser:{job_id}:{analysis_version}:{resume_hash}"
+        return f"parser_cache:{job_id}:{resume_hash}:{analysis_version}"
 
     @staticmethod
     def build_strategy_key(
         cluster: str,
-        resume_hash: str,
-        analysis_version: int,
-        cluster_input_hash: str,
         filter_company: str | None,
         filter_min_score: int | None,
+        resume_hash: str,
+        analysis_version: int,
     ) -> str:
-        company_token = (filter_company or "*").strip().lower() or "*"
-        min_score_token = "*" if filter_min_score is None else str(filter_min_score)
-        return (
-            f"strategy:{cluster}:{analysis_version}:{resume_hash}:"
-            f"{company_token}:{min_score_token}:{cluster_input_hash}"
-        )
+        company_token = CacheService._normalize_cache_token(filter_company, empty_token="all")
+        min_score_token = "all" if filter_min_score is None else str(filter_min_score)
+        return f"strategy_cache:{cluster}:{company_token}:{min_score_token}:{resume_hash}:{analysis_version}"
+
+    @staticmethod
+    def _normalize_cache_token(value: str | None, *, empty_token: str) -> str:
+        if not value:
+            return empty_token
+        return value.strip().lower().replace(":", "_") or empty_token
 
     @staticmethod
     def _build_key(jd_text: str) -> str:

@@ -34,6 +34,7 @@ class JobAnalysisSnapshot(BaseModel):
     must_have_keywords: list[str]
     nice_to_have_keywords: list[str]
     domain_keywords: list[str]
+    gap_keywords: list[str] = Field(default_factory=list)
     years_required: str
     top_gaps: list[str]
     screening_risks: list[str]

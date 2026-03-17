@@ -179,10 +179,11 @@ class JobService:
     def _serialize_row(self, job: Job, analysis: JobAnalysis | None, workflow: Workflow | None) -> dict[str, Any]:
         analysis_payload = None
         if analysis is not None:
+            top_gaps = _parse_json_list(analysis.top_gaps)
             priority = workflow.priority if workflow is not None else compute_priority(
                 analysis.fit_score,
                 analysis.years_required,
-                len(_parse_json_list(analysis.top_gaps)),
+                len(top_gaps),
             )
             analysis_payload = {
                 "company": job.company or "",
@@ -193,8 +194,9 @@ class JobService:
                 "must_have_keywords": _parse_json_list(analysis.must_have_keywords),
                 "nice_to_have_keywords": _parse_json_list(analysis.nice_to_have_keywords),
                 "domain_keywords": _parse_json_list(analysis.domain_keywords),
+                "gap_keywords": top_gaps,
                 "years_required": analysis.years_required,
-                "top_gaps": _parse_json_list(analysis.top_gaps),
+                "top_gaps": top_gaps,
                 "screening_risks": _parse_json_list(analysis.screening_risks),
                 "recommended_resume_version": analysis.recommended_resume_version,
                 "resume_tweak_suggestions": _parse_json_list(analysis.resume_tweak_suggestions),

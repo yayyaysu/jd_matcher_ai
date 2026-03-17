@@ -14,12 +14,14 @@ from app.core.config import settings
 from app.db.models.job_analysis import JobAnalysis
 from app.db.models.jobs import Job
 from app.db.models.resume_strategy import ResumeStrategy
+from app.db.models.workflow import Workflow
 from app.prompts.schemas import STRATEGIST_SCHEMA
 from app.services.cache_service import CacheService
 from app.services.openai_client import OpenAIClient
 from app.services.resume_service import load_resume_payload
+from app.schemas.ai import StrategistAIResult
 
-PROMPT_PATH = Path(__file__).resolve().parents[1] / "prompts" / "strategist_prompt.txt"
+PROMPT_PATH = settings.prompt_dir / "strategist_prompt.txt"
 
 
 def load_prompt() -> str:
@@ -199,10 +201,11 @@ class StrategyService:
         cluster: str | None,
         filter_company: str | None,
         filter_min_score: int | None,
+        applied_status: str | None,
         force: bool = False,
     ) -> dict[str, Any]:
         resume_text, resume_hash = load_resume_payload()
-        clusters = self._get_target_clusters(cluster, resume_hash, filter_company, filter_min_score)
+        clusters = self._get_target_clusters(cluster, resume_hash, filter_company, filter_min_score, applied_status)
         items: list[dict[str, Any]] = []
         for target_cluster in clusters:
             result = await self._build_strategy(
@@ -211,6 +214,7 @@ class StrategyService:
                 resume_hash=resume_hash,
                 filter_company=filter_company,
                 filter_min_score=filter_min_score,
+                applied_status=applied_status,
                 force=force,
             )
             if result is not None:
@@ -230,6 +234,7 @@ class StrategyService:
         cluster: str | None,
         filter_company: str | None,
         filter_min_score: int | None,
+        applied_status: str | None = None,
         limit: int = 20,
     ) -> dict[str, Any]:
         stmt = select(ResumeStrategy).order_by(ResumeStrategy.generated_at.desc(), ResumeStrategy.id.desc()).limit(limit)
@@ -252,13 +257,14 @@ class StrategyService:
         resume_hash: str,
         filter_company: str | None,
         filter_min_score: int | None,
+        applied_status: str | None,
         force: bool,
     ) -> dict[str, Any] | None:
         resume_variant = map_resume_variant(cluster)
         if resume_variant is None:
             return None
 
-        rows = self._fetch_analysis_rows(cluster, resume_hash, filter_company, filter_min_score)
+        rows = self._fetch_analysis_rows(cluster, resume_hash, filter_company, filter_min_score, applied_status)
         output_filename = build_strategy_filename(cluster, filter_company, filter_min_score)
         if not rows:
             section_md = self._render_no_matching_markdown(cluster, filter_company, filter_min_score)
@@ -287,20 +293,22 @@ class StrategyService:
         )
         cache_key = self.cache.build_strategy_key(
             cluster,
-            resume_hash,
-            settings.analysis_version,
-            cluster_input_hash,
             filter_company,
             filter_min_score,
+            resume_hash,
+            settings.analysis_version,
         )
 
         source = "openai"
         cached_payload: dict[str, Any] | None = None
         if not force:
             cached_payload = await self.cache.get_json(cache_key)
-            if cached_payload is not None:
+            if cached_payload is not None and cached_payload.get("cluster_input_hash") == cluster_input_hash:
                 source = "redis"
             else:
+                cached_payload = None
+
+            if cached_payload is None:
                 cached_row = self._fetch_cached_strategy(
                     cluster,
                     resume_variant,
@@ -385,10 +393,13 @@ class StrategyService:
             ),
             schema=STRATEGIST_SCHEMA,
             schema_name="resume_strategy",
+            pipeline_type="strategist",
             max_output_tokens=2400,
         )
-        result["resume_variant"] = resume_variant
-        return result
+        validated = StrategistAIResult.model_validate(result)
+        payload = validated.model_dump()
+        payload["resume_variant"] = resume_variant
+        return payload
 
     def _fetch_analysis_rows(
         self,
@@ -396,10 +407,12 @@ class StrategyService:
         resume_hash: str,
         filter_company: str | None,
         filter_min_score: int | None,
+        applied_status: str | None,
     ) -> list[dict[str, Any]]:
         stmt = (
             select(JobAnalysis, Job.company)
             .join(Job, Job.id == JobAnalysis.job_id)
+            .join(Workflow, Workflow.job_id == Job.id)
             .where(
                 JobAnalysis.cluster == cluster,
                 JobAnalysis.resume_hash == resume_hash,
@@ -410,6 +423,10 @@ class StrategyService:
             stmt = stmt.where(Job.company == filter_company)
         if filter_min_score is not None:
             stmt = stmt.where(JobAnalysis.fit_score >= filter_min_score)
+        if applied_status == "Applied":
+            stmt = stmt.where(Workflow.applied.is_(True))
+        elif applied_status == "Not Applied":
+            stmt = stmt.where(Workflow.applied.is_(False))
         rows = self.db.execute(stmt).all()
         payloads: list[dict[str, Any]] = []
         for analysis, company in rows:
@@ -433,6 +450,7 @@ class StrategyService:
         resume_hash: str,
         filter_company: str | None,
         filter_min_score: int | None,
+        applied_status: str | None,
     ) -> list[str]:
         if cluster and cluster.lower() != "all":
             return [cluster]
@@ -441,12 +459,18 @@ class StrategyService:
             JobAnalysis.resume_hash == resume_hash,
             JobAnalysis.analysis_version == settings.analysis_version,
         )
-        if filter_min_score is not None or filter_company:
+        if filter_min_score is not None or filter_company or applied_status:
             stmt = stmt.join(Job, Job.id == JobAnalysis.job_id)
+        if applied_status:
+            stmt = stmt.join(Workflow, Workflow.job_id == Job.id)
         if filter_company:
             stmt = stmt.where(Job.company == filter_company)
         if filter_min_score is not None:
             stmt = stmt.where(JobAnalysis.fit_score >= filter_min_score)
+        if applied_status == "Applied":
+            stmt = stmt.where(Workflow.applied.is_(True))
+        elif applied_status == "Not Applied":
+            stmt = stmt.where(Workflow.applied.is_(False))
 
         rows = self.db.execute(stmt.order_by(JobAnalysis.cluster.asc())).all()
         return [row[0] for row in rows if map_resume_variant(row[0])]

@@ -1,0 +1,47 @@
+### 自傳
+
+我是國立高雄大學資工系應屆畢業生，具備後端與系統整合背景。曾於優肯數位獨立設計並實作 AI 意圖判斷系統，負責系統架構、RESTful API 與資料庫整合，完成既有客服／點餐系統串接並實際上線。
+
+熟悉後端服務開發與跨系統資料流設計，具備將需求轉換為可維運系統的實務經驗，期望投入企業系統之建置與優化。
+
+---
+
+### 技能
+
+**Backend**：Python / C++ / SQL｜Flask（RESTful API：規格／參數驗證／錯誤碼）｜系統整合（跨系統串接、格式轉換、流程設計）｜MySQL / PostgreSQL
+
+**Deployment & Reliability**：Linux（服務/Log 排查）｜Git｜Docker / docker-compose｜CI/CD：GitHub Actions（build/deploy）｜GCP（部署／環境變數）
+
+**AI**：LLM/RAG（LangChain、OpenAI API：檢索策略／回覆穩定性）｜Transformer NLP（意圖/語意分析）｜PyTorch（訓練 / 驗證 / 推論 / 邊緣部署）｜AI×Backend 分工（deterministic fallback）
+
+---
+
+### 工作經驗（3 bullets）
+
+**Yocan Digital Media｜軟體工程師（2025/07 – 2026/01）**
+
+- **將 AI 服務接入既有系統並實際上線**：獨立設計 AI 意圖判斷系統架構與資料流程，透過 RESTful API 整合 LLM/RAG 至客服與點餐系統，作為可被既有系統呼叫的後端服務。
+- **以規格化 API 保護系統穩定性**：實作參數驗證、錯誤碼與 deterministic validation / fallback，避免 AI 輸出直接影響業務邏輯，確保結果可被既有系統安全接收與使用。
+- **負責部署交付與系統問題拆解**：Docker 封裝服務並以 GitHub Actions 自動化 CI/CD 降低維運成本；分析點餐系統與 LINE MINI App 架構差異，並提出調整方案。
+
+---
+
+### 專案經驗
+
+**AI 意圖判斷系統（客服/點餐整合）**
+
+- 將「意圖分類 + RAG 問答 + 操作流程」整合為單一 API，支援多店家知識庫與穩定回應，上線於實際營運流程。
+- Tech：Python、Flask/FastAPI、LangChain、OpenAI API、FAISS、MySQL、Docker、Alembic｜Result：點餐、客服準確率 (98%+ , 95%+)，token使用量下降50%
+
+**AI 股市分析助理（漲Llama）**
+
+- RAG 結合個股指標資料庫與新聞，自動彙整並生成分析與策略建議；以隨機森林回測驗證策略表現。
+- Tech：Python（Flask）、LangChain、向量資料庫、GCP、LLM（Llama、BERT）｜Result：隨機森林回測，長期報酬率波動明顯小於大盤，榮獲智慧感測聯網創新應用競賽「亞軍」
+
+---
+
+### 學歷（1 行）
+
+**國立高雄大學 資訊工程學系**｜應屆畢業 學士
+
+語言  : English - TOEIC 720

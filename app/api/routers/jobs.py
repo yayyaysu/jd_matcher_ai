@@ -47,6 +47,16 @@ async def analyze_jobs(payload: JobAnalyzeRequest, db: Session = Depends(get_db)
     return JobAnalyzeResponse(**result)
 
 
+@router.post("/analyze/{job_id}", response_model=JobAnalyzeResponse)
+async def analyze_single_job(job_id: str, force: bool = False, db: Session = Depends(get_db)) -> JobAnalyzeResponse:
+    parser_service = ParserService(db)
+    try:
+        result = await parser_service.analyze_jobs(job_ids=[job_id], force=force)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return JobAnalyzeResponse(**result)
+
+
 @router.get("", response_model=JobListResponse)
 def list_jobs(
     cluster: str | None = None,
