@@ -1,4 +1,4 @@
-name: CI - Build and Push Docker Image
+name: CI - Build and Push Docker Images
 
 on:
   push:
@@ -29,11 +29,20 @@ jobs:
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/jd_matcher_ai:latest
 
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./frontend/Dockerfile
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/jd_matcher_ai_ui:latest
+
       - name: Publish build summary
         run: |
           {
             echo "## CI Result"
             echo "- Docker Hub login success"
             echo "- Backend image pushed: ${{ secrets.DOCKERHUB_USERNAME }}/jd_matcher_ai:latest"
+            echo "- Frontend image pushed: ${{ secrets.DOCKERHUB_USERNAME }}/jd_matcher_ai_ui:latest"
             echo "- No deployment step is configured in this workflow"
           } >> "$GITHUB_STEP_SUMMARY"
