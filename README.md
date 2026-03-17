@@ -56,11 +56,19 @@ JD Matcher v2 是一個把「職缺整理、AI 分析、投遞追蹤、履歷策
 4. 在 Strategy 頁面針對特定 cluster 生成履歷策略。
 5. 到 `data/outputs/` 取得 markdown 與 csv 輸出。
 
-## 本機啟動
+## CI（GitHub Actions）+ Local CD（Docker hub）
+
+本專案的交付流程是：開發者 `git push` 後，由 GitHub Actions 自動 build backend / frontend images 並 push 到 Docker Hub；本機或展示環境再透過 Docker Compose 啟動或更新容器。
 
 ```powershell
 copy .env.example .env
 docker compose up --build
+```
+
+更新最新 image：
+
+```powershell
+.\update.ps1
 ```
 
 必要條件：
