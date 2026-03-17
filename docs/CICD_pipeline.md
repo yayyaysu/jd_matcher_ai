@@ -1,295 +1,358 @@
-# CI/CD Pipeline
+# CI/CD Pipeline（Current Architecture）
 
-這份文件描述目前 `jd_matcher_ai` 專案的 GitHub Actions 流程。現在的架構已經是 CI-only，不包含任何自動部署，不會 SSH 進 server，也不會執行遠端 `docker compose`。
+這份文件描述目前 `jd_matcher_ai` 專案的 **CI（GitHub Actions）+ Local CD（本機部署）** 架構。
 
-目標是讓後續開發者一眼看懂：
+目前已完成：
 
-- 程式碼 push 後會發生什麼事
-- GitHub Actions 目前只做到哪裡
-- Docker Hub 在流程中的角色
-- 哪些環境配置還需要事先準備
-- 哪些事情現在還沒有被自動化
+* ✅ GitHub Actions 自動 build backend + frontend images
+* ✅ 自動 push 到 Docker Hub
+* ✅ 本機可透過 `update.ps1` / `update.sh` 自動 pull + restart containers
 
-## 1. 目前流程目標
+---
 
-目前的流程是：
+# 1. 目前完整流程（CI + Local CD）
 
 ```text
 git push to main/master
--> GitHub Actions
--> build Docker image
--> push image to Docker Hub
--> workflow 結束
+↓
+GitHub Actions
+↓
+build backend image
+↓
+build frontend image
+↓
+push images to Docker Hub
+↓
+（本機）
+update.ps1 / update.sh
+↓
+docker compose pull
+↓
+docker compose up -d
+↓
+containers restart
 ```
 
-這代表目前 pipeline 的責任只有：
+---
 
-- 自動驗證 GitHub Actions 能成功 build image
-- 自動把最新 image push 到 Docker Hub
-
-這代表目前 pipeline 不負責：
-
-- SSH 到任何 server
-- 連到 VPS
-- 執行遠端 `docker compose pull`
-- 執行遠端 `docker compose up -d`
-- 自動更新正式或測試環境容器
-
-## 2. 一眼看懂現在的 CI-only 架構
+# 2. 一眼看懂架構
 
 ```mermaid
 flowchart LR
-		A[Developer push to GitHub main/master] --> B[GitHub Actions deploy.yml]
-		B --> C[Checkout source]
-		C --> D[Login to Docker Hub]
-		D --> E[Set up Docker Buildx]
-		E --> F[Build backend image]
-		F --> G[Push image to Docker Hub]
-		G --> H[Workflow finished]
+    A[Developer push] --> B[GitHub Actions]
+    B --> C[Build backend image]
+    B --> D[Build frontend image]
+    C --> E[Push backend image]
+    D --> F[Push frontend image]
+    E --> G[Docker Hub]
+    F --> G
+    G --> H[Local machine]
+    H --> I[docker compose pull]
+    I --> J[docker compose up -d]
 ```
 
-一句話總結：
+---
 
-`目前 GitHub Actions 只負責 build 與 push Docker image，部署仍是手動或未來再補。`
+# 3. CI（GitHub Actions）
 
-## 3. 目前實作完成的元件
+## 3.1 Workflow
 
-### 3.1 GitHub Actions workflow
+檔案：
 
-目前 workflow 檔案：
+```text
+.github/workflows/deploy.yml
+```
 
-- `.github/workflows/deploy.yml`
+---
 
-目前 workflow name：
+## 3.2 觸發條件
 
-- `CI - Build and Push Docker Image`
+```yaml
+on:
+  push:
+    branches:
+      - main
+      - master
+```
 
-目前只保留一個 job：
+---
 
-- `build-and-push`
+## 3.3 CI 做的事情
 
-### 3.2 Backend Docker image
+### Step 1：Checkout
 
-目前 workflow 使用根目錄 `Dockerfile` 建立 backend image。
+```yaml
+uses: actions/checkout@v4
+```
 
-目前推送的 tag：
+---
+
+### Step 2：Login Docker Hub
+
+使用 secrets：
+
+* `DOCKERHUB_USERNAME`
+* `DOCKERHUB_TOKEN`
+
+---
+
+### Step 3：Build backend image
 
 ```text
 <dockerhub_username>/jd_matcher_ai:latest
 ```
 
-注意：
+---
 
-- image 名稱已跟 workflow 設定一致
+### Step 4：Build frontend image
 
-### 3.3 Docker Hub
-
-Docker Hub 目前扮演的角色只有一個：
-
-- 保存 GitHub Actions build 出來的最新 image
-
-目前 workflow 成功後，Docker Hub 應該能看到新的：
-
-- `<dockerhub_username>/jd_matcher_ai:latest`
-
-## 4. GitHub Actions 實際執行流程
-
-### 4.1 Trigger
-
-觸發條件：
-
-```yaml
-on:
-	push:
-		branches:
-			- main
-			- master
+```text
+<dockerhub_username>/jd_matcher_ai_ui:latest
 ```
 
-也就是說，只要 push 到 `main` 或 `master`，workflow 就會啟動。
+---
 
-### 4.2 Step 1: Checkout source
+## 3.4 CI 的責任（很重要）
 
-使用：
+CI 只負責：
 
-- `actions/checkout@v4`
+* build image
+* push image
 
-作用：
+CI 不負責：
 
-- 把 repository source code 取到 GitHub Actions runner
-- 作為 Docker build context
+* 部署
+* container restart
+* SSH / server
 
-### 4.3 Step 2: Login to Docker Hub
+---
 
-使用：
+# 4. Docker Hub
 
-- `docker/login-action@v3`
+目前會有兩個 image：
 
-使用的 secrets：
+```text
+<dockerhub_username>/jd_matcher_ai
+<dockerhub_username>/jd_matcher_ai_ui
+```
 
-- `DOCKERHUB_USERNAME`
-- `DOCKERHUB_TOKEN`
+---
 
-作用：
+CI 成功後應該看到：
 
-- 讓 runner 有權限 push image 到 Docker Hub
+```text
+latest tag updated
+```
 
-### 4.4 Step 3: Set up Docker Buildx
+---
 
-使用：
+# 5. Local CD（本機部署）
 
-- `docker/setup-buildx-action@v3`
+## 5.1 docker-compose.yml
 
-作用：
+```yaml
+services:
+  api:
+    image: ian61236123/jd_matcher_ai:latest
 
-- 建立 Docker Buildx 環境
-- 讓後續 image build/push 流程更穩定且符合標準做法
+  frontend:
+    image: ian61236123/jd_matcher_ai_ui:latest
 
-### 4.5 Step 4: Build and push backend image
+  mysql:
+    image: mysql:8
 
-使用：
+  redis:
+    image: redis:7
+```
 
-- `docker/build-push-action@v6`
+---
 
-目前設定：
+## 5.2 update script
 
-- build context: repository root
-- push: `true`
-- tag: `${{ secrets.DOCKERHUB_USERNAME }}/jd_matcher_ai:latest`
+### Windows（PowerShell）
 
-結果：
+```powershell
+# update.ps1
 
-- workflow 成功後，最新 backend image 會被 push 到 Docker Hub
+Write-Host "Pull latest images..."
+docker compose pull
 
-### 4.6 Step 5: Publish build summary
+Write-Host "Restart containers..."
+docker compose up -d
 
-workflow 會把結果寫進 GitHub Actions summary，方便快速確認：
+Write-Host "Update complete!"
+```
 
-- Docker Hub login 成功
-- backend image push 成功
-- 目前沒有 deployment step
+---
 
-## 5. 明確移除的部署邏輯
+### Mac / Linux
 
-這次 refactor 之後，以下內容都已經從 workflow 移除：
+```bash
+# update.sh
 
-- `SERVER_HOST`
-- `SERVER_USER`
-- `SERVER_PORT`
-- `SERVER_SSH_KEY`
-- `SERVER_PROJECT_DIR`
-- SSH action
-- remote server commands
-- 遠端 `docker compose pull`
-- 遠端 `docker compose up -d`
-- 任何 deploy job 或 deploy step
+docker compose pull
+docker compose up -d
+```
 
-這表示目前 repository 的 GitHub Actions 不再依賴：
+---
 
-- VPS
-- SSH 金鑰
-- 遠端部署目錄
-- 遠端 Docker Compose
+## 5.3 使用方式
 
-## 6. 目前失敗條件
+```bash
+./update.sh
+```
 
-目前 workflow 會在以下情況失敗：
+或：
 
-- `DOCKERHUB_USERNAME` 沒設
-- `DOCKERHUB_TOKEN` 沒設
-- Docker Hub login 失敗
-- Docker image build 失敗
-- Docker image push 失敗
+```powershell
+.\update.ps1
+```
 
-這些失敗都屬於 CI 範圍內的合理失敗。
+---
 
-## 7. 目前日誌會顯示什麼
+## 5.4 發生什麼事
 
-GitHub Actions logs 目前會清楚顯示：
+```text
+docker compose pull → 從 Docker Hub 抓最新 image
+docker compose up -d → 自動重建 container
+```
 
-- checkout 是否完成
-- Docker Hub login 是否完成
-- Buildx 是否完成初始化
-- backend image 是否成功 build
-- backend image 是否成功 push
-- summary 是否完成
+---
 
-這已足夠支持目前的 CI-only 流程。
+# 6. 成功驗證方式
 
-## 8. 跟目前系統架構的關係
+## 6.1 CI 是否成功
 
-這次改動沒有修改應用邏輯，也沒有改變系統分層。它只把原本包含 deploy 的 workflow 收斂成單純的 CI 流程。
+GitHub → Actions：
 
-所以目前狀態是：
+```text
+✔ build-and-push 成功
+```
 
-- FastAPI backend 架構不變
-- MySQL / Redis / Streamlit / Docker Compose 架構不變
-- `system_design.md` 描述的應用內部分層不變
-- 改變的只有 GitHub Actions 自動化範圍
+---
 
-換句話說：
+## 6.2 Docker Hub
 
-- 應用本身仍可用 Docker Compose 啟動
-- 但 GitHub Actions 目前只幫你產生並推送 image
-- 不幫你自動把 image 套用到任何 server
+```text
+latest updated time = 最新
+```
 
-## 9. 目前尚未做的環境配置
+---
 
-這一段列的是「為了讓目前 CI-only workflow 正常運作」還需要完成的設定。
+## 6.3 本機
 
-### 9.1 GitHub Secrets
+```bash
+docker compose pull
+```
 
-目前至少要設定：
+應看到：
 
-1. `DOCKERHUB_USERNAME`
-	 - Docker Hub 使用者名稱
+```text
+Downloaded newer image
+```
 
-2. `DOCKERHUB_TOKEN`
-	 - Docker Hub access token
-	 - 應具備 push image 權限
+---
 
-### 9.2 Docker Hub repository
+```bash
+docker ps
+```
 
-目前需要確認 Docker Hub 上已存在或允許建立：
+應看到：
 
-1. `jd_matcher_ai`
+```text
+api / frontend / mysql / redis running
+```
 
-如果 repository 權限或命名不正確，workflow push 會失敗。
+---
 
-### 9.3 GitHub Repository 權限
+# 7. 常見錯誤（重要）
 
-需要確認目前 GitHub repository 有權限執行 Actions，且沒有被 branch policy 或 org policy 阻擋 Docker login / build / push。
+## ❌ manifest not found
 
-### 9.4 Dockerfile 可持續維護
+```text
+原因：image 沒 push 或名稱不一致
+```
 
-因為目前 workflow 是直接用根目錄 `Dockerfile` build image，所以後續如果調整 backend 執行環境，必須同步確認：
+---
 
-- `Dockerfile` 仍可成功 build
-- build context 沒有被錯誤改壞
-- image push 後仍可被正確使用
+## ❌ DOCKERHUB_USERNAME not set
 
-## 10. 目前沒有自動化的部分
+```text
+原因：docker-compose 使用 env，但本機沒有
+```
 
-以下事情現在仍未自動化：
+👉 解法：
 
-- server deployment
-- image rollout
-- container restart
-- remote health check
-- rollback
+```text
+直接寫死 image name（推薦）
+```
 
-如果未來要恢復 CD，再另外新增 deploy workflow 或 deploy job 會比較乾淨，不建議把 server 邏輯再混回目前這個 CI-only workflow。
+---
 
-## 11. 後續開發建議
+## ❌ pull 沒更新
 
-如果下一步要強化目前 CI-only pipeline，建議順序如下：
+```text
+原因：latest 沒變 or CI 沒成功
+```
 
-1. 在 build 前加上測試步驟，例如 `pytest`
-2. 為 image 增加 immutable tag，例如 commit SHA
-3. 視需要再新增獨立 deploy workflow，而不是把 deploy 硬塞回現在這支 CI workflow
+---
 
-## 12. 一句話記住現在的架構
+# 8. 架構設計原則（關鍵理解）
 
-`現在的 GitHub Actions 只做 CI：build image、push 到 Docker Hub，沒有任何自動部署。`
-- Docker Compose：負責編排 API、UI、MySQL、Redis、phpMyAdmin
+## 8.1 每個 service = 一個 image
 
+```text
+backend → jd_matcher_ai
+frontend → jd_matcher_ai_ui
+```
+
+---
+
+## 8.2 不要把 frontend + backend 放同一 container
+
+原因：
+
+* 無法獨立部署
+* 無法擴展
+* 不符合業界架構
+
+---
+
+# 9. 目前尚未做的（未來可擴展）
+
+* 自動 deploy（CD）
+* VPS / server 部署
+* rollback 機制
+* health check
+* version tagging（非 latest）
+
+---
+
+# 10. 後續建議
+
+建議優先順序：
+
+1. image tag 加上 commit SHA
+2. CI 加上測試（pytest）
+3. 再導入正式 CD（SSH / VPS）
+
+---
+
+# 11. 一句話記住
+
+```text
+CI：build + push image
+CD（現在）：手動 update.sh
+```
+
+---
+
+# 12. TL;DR（最重要）
+
+```text
+git push → CI build → push Docker Hub
+↓
+手動執行 update.sh
+↓
+系統更新完成
+```
