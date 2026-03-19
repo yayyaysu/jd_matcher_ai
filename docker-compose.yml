@@ -1,6 +1,6 @@
 services:
   api:
-    image: ${DOCKERHUB_USERNAME}/jd_matcher_ai:latest
+    image: ${DOCKERHUB_USERNAME:-ian61236123}/jd_matcher_ai:latest
     pull_policy: always
     container_name: jd_matcher_v2_api
     restart: unless-stopped
@@ -17,7 +17,7 @@ services:
         condition: service_healthy
 
   frontend:
-    image: ${DOCKERHUB_USERNAME}/jd_matcher_ai_ui:latest
+    image: ${DOCKERHUB_USERNAME:-ian61236123}/jd_matcher_ai_ui:latest
     pull_policy: always
     container_name: jd_matcher_v2_frontend
     restart: unless-stopped
@@ -25,12 +25,13 @@ services:
       API_BASE_URL: ${API_BASE_URL}
     ports:
       - "8501:8501"
+    command: ["streamlit", "run", "/app/ui/app.py", "--server.address=0.0.0.0", "--server.port=8501", "--server.headless=true"]
     depends_on:
       api:
         condition: service_started
 
   phpmyadmin:
-    image: phpmyadmin:5-apache
+    image: phpmyadmin/phpmyadmin:latest
     container_name: jd_matcher_v2_phpmyadmin
     restart: unless-stopped
     environment:
