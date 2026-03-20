@@ -73,6 +73,7 @@ class ParserService:
         cache_key = self.cache.build_parser_key(job.id, resume_hash, settings.analysis_version)
         analysis_row = self.db.get(JobAnalysis, (job.id, settings.analysis_version))
         payload: dict[str, Any] | None = None
+        token_usage = self._empty_token_usage()
         source = "openai"
 
         if not force:
@@ -85,7 +86,7 @@ class ParserService:
                 await self.cache.set_json(cache_key, payload)
 
         if payload is None:
-            payload = self._generate_analysis(job.jd_text, resume_text)
+            payload, token_usage = self._generate_analysis(job.jd_text, resume_text)
 
         validated = ParserAIResult.model_validate(payload)
         payload = validated.model_dump()
@@ -143,6 +144,7 @@ class ParserService:
                 "priority": priority,
                 "cache_hit": source in {"redis", "database"},
                 "source": source,
+                "token_usage": token_usage,
                 "job_id": job.id,
                 "workflow_status": workflow.status,
                 "next_action": workflow.next_action,
@@ -175,9 +177,9 @@ class ParserService:
             "cache_hits": cache_hits,
         }
 
-    def _generate_analysis(self, jd_text: str, resume_text: str) -> dict[str, Any]:
+    def _generate_analysis(self, jd_text: str, resume_text: str) -> tuple[dict[str, Any], dict[str, int]]:
         client = OpenAIClient()
-        return client.generate_json(
+        return client.generate_json_with_metadata(
             model=settings.parser_model,
             system_prompt=load_prompt(),
             user_content=build_user_content(jd_text, resume_text),
@@ -186,6 +188,10 @@ class ParserService:
             pipeline_type="parser",
             max_output_tokens=900,
         )
+
+    @staticmethod
+    def _empty_token_usage() -> dict[str, int]:
+        return {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0}
 
     @staticmethod
     def _priority_next_action(priority: str) -> str:

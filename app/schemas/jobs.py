@@ -14,6 +14,12 @@ class JobCreateRequest(BaseModel):
     auto_analyze: bool = False
 
 
+class TokenUsageSnapshot(BaseModel):
+    input_tokens: int = 0
+    output_tokens: int = 0
+    total_tokens: int = 0
+
+
 class WorkflowSnapshot(BaseModel):
     priority: str
     status: str
@@ -45,6 +51,7 @@ class JobAnalysisSnapshot(BaseModel):
     priority: str
     cache_hit: bool = False
     source: str
+    token_usage: TokenUsageSnapshot | None = None
     workflow_status: str
     next_action: str
 
@@ -62,6 +69,7 @@ class JobRecord(BaseModel):
 
 class JobCreateResponse(BaseModel):
     job: JobRecord
+    token_usage: TokenUsageSnapshot | None = None
 
 
 class JobListResponse(BaseModel):

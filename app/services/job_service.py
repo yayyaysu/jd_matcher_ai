@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import and_, select
+from sqlalchemy import and_, delete, select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -63,17 +63,17 @@ class JobService:
         return job
 
     def delete_job(self, job_id: str) -> bool:
-        workflow = self.db.get(Workflow, job_id)
-        analysis = self.db.get(JobAnalysis, (job_id, settings.analysis_version))
         job = self.db.get(Job, job_id)
         if job is None:
             return False
-        if workflow is not None:
-            self.db.delete(workflow)
-        if analysis is not None:
-            self.db.delete(analysis)
-        self.db.delete(job)
-        self.db.commit()
+        try:
+            self.db.execute(delete(JobAnalysis).where(JobAnalysis.job_id == job_id))
+            self.db.execute(delete(Workflow).where(Workflow.job_id == job_id))
+            self.db.execute(delete(Job).where(Job.id == job_id))
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+            raise
         return True
 
     def update_workflow(

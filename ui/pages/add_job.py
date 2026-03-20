@@ -10,14 +10,32 @@ UI_ROOT = Path(__file__).resolve().parents[1]
 if str(UI_ROOT) not in sys.path:
     sys.path.insert(0, str(UI_ROOT))
 
-from helpers import api_request, refresh_data
+from helpers import api_request, fetch_companies, refresh_data
+
+
+if "add_job_company" not in st.session_state:
+    st.session_state["add_job_company"] = ""
+
+
+def _apply_existing_company() -> None:
+    selected_company = st.session_state.get("add_job_company_picker") or ""
+    if selected_company:
+        st.session_state["add_job_company"] = selected_company
 
 st.set_page_config(page_title="Add Job", layout="wide")
 st.title("Add Job")
 st.caption("Paste a job description, save it, and optionally run parser immediately.")
 
 meta_col1, meta_col2 = st.columns(2)
-company = meta_col1.text_input("Company")
+known_companies = ["", *fetch_companies()]
+meta_col1.selectbox(
+    "Use Existing Company",
+    known_companies,
+    key="add_job_company_picker",
+    on_change=_apply_existing_company,
+    help="Pick a company you have already saved, or type a new one below.",
+)
+company = meta_col1.text_input("Company", key="add_job_company")
 role_title = meta_col2.text_input("Role Title")
 url = meta_col1.text_input("Job URL")
 notes = meta_col2.text_input("Notes")
@@ -43,6 +61,14 @@ if st.button("Add Job", type="primary", use_container_width=True):
             )
             refresh_data()
             st.success("Job added successfully.")
+            token_usage = result.get("token_usage") or {}
+            if auto_analyze and token_usage:
+                st.toast(
+                    "Parser token usage"
+                    f" | input {token_usage.get('input_tokens', 0)}"
+                    f" | output {token_usage.get('output_tokens', 0)}"
+                    f" | total {token_usage.get('total_tokens', 0)}"
+                )
             job = result.get("job", {})
             analysis = job.get("analysis") or {}
             workflow = job.get("workflow") or {}
@@ -57,6 +83,7 @@ if st.button("Add Job", type="primary", use_container_width=True):
                 st.markdown("**Parser summary**")
                 st.write(f"Fit Score: {analysis.get('fit_score', '-')}")
                 st.write(f"Recommended Resume Version: {analysis.get('recommended_resume_version', '-')}")
+                st.write(f"Token Usage: {token_usage.get('total_tokens', 0)} total")
                 st.write("Top Gaps")
                 st.write(analysis.get("top_gaps", []))
         except httpx.HTTPStatusError as exc:

@@ -23,6 +23,7 @@ router = APIRouter(prefix="/jobs", tags=["jobs"])
 @router.post("/add", response_model=JobCreateResponse)
 async def add_job(payload: JobCreateRequest, db: Session = Depends(get_db)) -> JobCreateResponse:
     job_service = JobService(db)
+    token_usage = None
     job = job_service.add_job(
         jd_text=payload.jd_text,
         url=payload.url,
@@ -32,8 +33,9 @@ async def add_job(payload: JobCreateRequest, db: Session = Depends(get_db)) -> J
     )
     if payload.auto_analyze:
         parser_service = ParserService(db)
-        await parser_service.analyze_job(job.id)
-    return JobCreateResponse(job=job_service.get_job_snapshot(job.id))
+        analysis_result = await parser_service.analyze_job(job.id)
+        token_usage = analysis_result.get("token_usage")
+    return JobCreateResponse(job=job_service.get_job_snapshot(job.id), token_usage=token_usage)
 
 
 @router.post("/analyze", response_model=JobAnalyzeResponse)
